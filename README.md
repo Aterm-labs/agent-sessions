@@ -168,12 +168,21 @@ El `.vsix` lleva el sidecar dentro, así que **no necesitas compilar nada más**
 
 ### En desarrollo (F5)
 
-Abre `vscode-extension/` en VS Code y pulsa **F5**. La extensión auto-localiza
-el sidecar en `target/release/agent-sessions-cli` o `target/debug/…` del
-workspace Cargo; si no existe, compila primero:
+El core Rust (que produce el sidecar) vive como **submodule** en `./aterm`.
+Clónalo recursivamente o inicialízalo:
 
 ```bash
-cargo build --release -p agent-sessions-cli
+git clone --recurse-submodules git@github.com:Aterm-labs/agent-sessions.git
+# o, si ya lo tienes clonado:
+git submodule update --init --recursive
+```
+
+Abre esta carpeta en VS Code y pulsa **F5**. La extensión auto-localiza el
+sidecar en `aterm/target/release/agent-sessions-cli` (o `debug/…`); si no
+existe, compílalo:
+
+```bash
+cargo build --release -p agent-sessions-cli --manifest-path aterm/Cargo.toml
 ```
 
 O fija `agentSessions.cliPath` a una ruta concreta en los ajustes.
