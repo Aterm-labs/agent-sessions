@@ -206,7 +206,12 @@ function cliPath(): string {
   if (extensionPath) {
     const exe = process.platform === "win32" ? ".exe" : "";
     const candidates = [
+      // Bundled in the .vsix (production).
       path.join(extensionPath, "bin", platformTarget(), `agent-sessions-cli${exe}`),
+      // Built from the core submodule (./aterm) during development.
+      path.join(extensionPath, "aterm", "target", "release", `agent-sessions-cli${exe}`),
+      path.join(extensionPath, "aterm", "target", "debug", `agent-sessions-cli${exe}`),
+      // Legacy: core checked out as the parent workspace.
       path.join(extensionPath, "..", "target", "release", `agent-sessions-cli${exe}`),
       path.join(extensionPath, "..", "target", "debug", `agent-sessions-cli${exe}`),
     ];

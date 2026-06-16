@@ -22,7 +22,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 EXT_ROOT="$(pwd)"
-REPO_ROOT="$(cd "$EXT_ROOT/.." && pwd)"
+# The Rust core (agent-sessions-cli) lives as a git submodule in ./aterm.
+REPO_ROOT="$EXT_ROOT/aterm"
+if [[ ! -f "$REPO_ROOT/Cargo.toml" ]]; then
+  echo "No encuentro el core Rust en $REPO_ROOT." >&2
+  echo "Inicializa el submodule:  git submodule update --init --recursive" >&2
+  exit 1
+fi
 
 # ── Pick the VSCE target ─────────────────────────────────────────────────────
 detect_host_vsce_target() {
