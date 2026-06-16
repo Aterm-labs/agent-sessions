@@ -1,0 +1,3 @@
+[submodule "aterm"]
+	path = aterm
+	url = git@github.com:Aterm-labs/aterm.git
