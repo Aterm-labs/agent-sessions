@@ -1,0 +1,48 @@
+# CI — compila la extensión (TypeScript) en cada push/PR y, como smoke test,
+# empaqueta un .vsix para linux-x64 (que además compila el sidecar Rust desde
+# el submódulo `aterm`). Si el .vsix se construye, todo el pipeline está sano.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: compile + smoke .vsix (linux-x64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # trae el core Rust (./aterm) para el sidecar
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: aterm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Compilar TypeScript
+        run: npm run compile
+
+      - name: Build .vsix (smoke)
+        run: bash scripts/build-vsix.sh linux-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-sessions-linux-x64-vsix
+          path: '*.vsix'
+          if-no-files-found: error
