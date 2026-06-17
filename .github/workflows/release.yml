@@ -6,7 +6,7 @@
 # NOTA: la publicación a los marketplaces (Open VSX / VS Marketplace) NO se hace
 # aquí. El paquete que va a los marketplaces es el OFICIAL (Community + módulo
 # Pro, gateado por licencia), que se construye y publica desde el repo privado
-# `aterm-pro` (su release.yml). Publicar también el Community aquí pisaría a la
+# `agent-sessions-pro` (su release.yml). Publicar también el Community aquí pisaría a la
 # build oficial en el mismo extension id.
 #
 # Triggers:
