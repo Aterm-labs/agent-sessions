@@ -219,6 +219,12 @@ El sidecar incluye un modo `serve` que habla JSON-RPC 2.0 sobre stdio
 - `get_session_turns(provider, id, limit?)` → turnos user/assistant.
 - `search_sessions(query, limit?)` → match contra título/cwd/branch/tags.
 
+> **Pro.** Las tools del MCP requieren licencia Pro (o la prueba de 14 días).
+> El gate lo controla la extensión, que al activar/validar la licencia escribe
+> `~/.config/aterm/pro-license.json`; el servidor `serve` lo lee y, sin Pro
+> válido, anuncia cero tools y rechaza las llamadas. El binario es OSS, así que
+> es un gate de cortesía, no inviolable.
+
 Para registrarlo con **Claude Code** (`~/.claude/mcp.json`):
 
 ```json

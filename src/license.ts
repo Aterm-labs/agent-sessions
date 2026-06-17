@@ -12,9 +12,17 @@
 //   - PRODUCT_ID (opcional): restringe a tu producto (meta.product_id de LS).
 
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 /** Trial length in days from first activation. */
 const TRIAL_DAYS = 14;
+
+/** Grace window (ms) baked into the Pro file so the MCP sidecar keeps working
+ *  between revalidations / while VS Code is closed. Refreshed on every state
+ *  change (startup, activation, 12h revalidation). */
+const PRO_FILE_GRACE_MS = TRIAL_DAYS * 86_400_000;
 
 /** Lemon Squeezy checkout links per plan. */
 export const BUY_URL_ANNUAL =
@@ -113,6 +121,36 @@ export class LicenseService {
       this.statusItem.backgroundColor = undefined;
     }
     this.statusItem.show();
+    this.syncProFile();
+  }
+
+  /** Mirror the current Pro state to `~/.config/aterm/pro-license.json` so the
+   *  MCP sidecar (`agent-sessions-cli serve`, a separate OSS process that can't
+   *  read VS Code's globalState) can gate its tools behind Pro. Path matches the
+   *  Rust side exactly (home + literal `.config/aterm`, cross-platform). */
+  private syncProFile(): void {
+    const st = this.status();
+    let payload: { pro: boolean; expiresAt: number };
+    if (st === "licensed") {
+      payload = { pro: true, expiresAt: Date.now() + PRO_FILE_GRACE_MS };
+    } else if (st === "trial") {
+      const start =
+        this.ctx.globalState.get<number>(TRIAL_START_KEY) ?? Date.now();
+      payload = { pro: true, expiresAt: start + TRIAL_DAYS * 86_400_000 };
+    } else {
+      payload = { pro: false, expiresAt: 0 };
+    }
+    const dir = path.join(os.homedir(), ".config", "aterm");
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "pro-license.json"),
+        JSON.stringify(payload) + "\n",
+        "utf8"
+      );
+    } catch {
+      /* best-effort: if we can't write, the MCP gate just stays closed */
+    }
   }
 
   /** Once per day, warn when the trial is about to lapse (≤3 days left). */
