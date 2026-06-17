@@ -8,7 +8,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Zarritas/aterm.git"
+    "url": "https://github.com/Aterm-labs/agent-sessions.git"
+  },
+  "homepage": "https://github.com/Aterm-labs/agent-sessions#readme",
+  "bugs": {
+    "url": "https://github.com/Aterm-labs/agent-sessions/issues"
   },
   "icon": "media/icon.png",
   "engines": {
