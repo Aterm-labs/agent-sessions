@@ -227,7 +227,9 @@ function platformTarget(): string {
     process.arch === "x64" ? "x86_64" : process.arch === "arm64" ? "aarch64" : process.arch;
   switch (process.platform) {
     case "linux":
-      return `${arch}-unknown-linux-gnu`;
+      // musl → binario estático: corre en cualquier glibc (evita el fallo
+      // GLIBC_2.xx por compilar en runners con glibc nueva).
+      return `${arch}-unknown-linux-musl`;
     case "darwin":
       return `${arch}-apple-darwin`;
     case "win32":

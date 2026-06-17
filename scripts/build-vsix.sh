@@ -51,8 +51,11 @@ VSCE_TARGET="${1:-$(detect_host_vsce_target)}"
 
 # Map VSCE target → rustc triple (also used as the bin/ subdir name).
 case "$VSCE_TARGET" in
-  linux-x64)    RUST_TRIPLE="x86_64-unknown-linux-gnu" ;;
-  linux-arm64)  RUST_TRIPLE="aarch64-unknown-linux-gnu" ;;
+  # Linux → musl: enlaza estático, así el sidecar corre en cualquier glibc
+  # (compilar contra gnu en runners modernos exige GLIBC nueva y rompe en
+  #  distros más antiguas: GLIBC_2.39 not found, etc.).
+  linux-x64)    RUST_TRIPLE="x86_64-unknown-linux-musl" ;;
+  linux-arm64)  RUST_TRIPLE="aarch64-unknown-linux-musl" ;;
   darwin-x64)   RUST_TRIPLE="x86_64-apple-darwin" ;;
   darwin-arm64) RUST_TRIPLE="aarch64-apple-darwin" ;;
   win32-x64)    RUST_TRIPLE="x86_64-pc-windows-msvc" ;;
