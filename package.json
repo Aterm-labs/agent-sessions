@@ -240,7 +240,7 @@
       },
       {
         "command": "agentSessions.configureMcp",
-        "title": "Configurar servidor MCP…",
+        "title": "Configurar servidor MCP… (Pro)",
         "category": "Agent Sessions",
         "icon": "$(server-process)"
       },

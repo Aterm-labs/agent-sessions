@@ -113,8 +113,10 @@ que usa la app nativa, así ambas UIs ven la misma metadata.
   cuentas con ventana de 1M.
 
 ### Integración
-- **MCP server** (`agent-sessions-cli serve`) + comando **«Configurar servidor
-  MCP…»** que lo registra con un clic. Ver "Uso como MCP".
+- **MCP server** (`agent-sessions-cli serve`, OSS) + comando **«Configurar
+  servidor MCP…» (Pro)** que lo registra con un clic. El servidor en sí es libre
+  (puedes lanzarlo y configurarlo a mano, ver "Uso como MCP"); la conveniencia
+  de registrarlo desde la extensión requiere licencia Pro.
 - **Previsualizar** la conversación en un panel estilado (turnos en burbujas con
   cabecera de metadatos y render Markdown), reutilizable entre sesiones.
 - Auto-localización del sidecar (empaquetado en el `.vsix` o `target/`).
@@ -137,6 +139,9 @@ son **Pro**:
   imprimir).
 - **Automatizaciones**: aviso cuando una sesión lleva *idle* más de N minutos
   (`pro.idleAlertMin`) y **resumen diario** de actividad/coste.
+- **Configurar servidor MCP con un clic**: registra el servidor MCP en
+  `.vscode/mcp.json` (o copia el snippet) desde la extensión. El servidor en sí
+  (`agent-sessions-cli serve`) es OSS y puedes configurarlo a mano gratis.
 
 Hay una **prueba de 14 días**; un indicador en la barra de estado muestra
 «Pro / Prueba Nd / Activar Pro». Después de la prueba, esas acciones piden

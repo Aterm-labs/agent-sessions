@@ -3181,6 +3181,9 @@ function registerTerminalProfiles(context: vscode.ExtensionContext): void {
  *  `.vscode/mcp.json`, or copies a generic `mcpServers` snippet for other
  *  tools (Claude Code, Cursor, …). */
 async function configureMcp(): Promise<void> {
+  // Función Pro: el servidor MCP en sí es OSS (`agent-sessions-cli serve`), pero
+  // registrarlo con un clic desde la extensión es una conveniencia de pago.
+  if (!requirePro("Configurar servidor MCP")) return;
   const entry = { command: cliPath(), args: ["serve"] };
   const choice = await vscode.window.showQuickPick(
     [
@@ -3313,7 +3316,7 @@ async function showActionsMenu(): Promise<void> {
     { label: "$(cloud-upload) Importar .zip…", command: "agentSessions.import" },
     { label: "$(archive) Backup del catálogo…", command: "agentSessions.backupCatalog" },
     { label: "$(history) Restaurar catálogo…", command: "agentSessions.restoreCatalog" },
-    { label: "$(server-process) Configurar servidor MCP…", command: "agentSessions.configureMcp" },
+    { label: `$(server-process) Configurar servidor MCP…${pro}`, command: "agentSessions.configureMcp" },
     { label: `$(diff) Comparar resultados de worktrees…${pro}`, command: "agentSessions.compareWorktrees" },
     { label: `$(trash) Limpiar worktrees de comparativa…${pro}`, command: "agentSessions.cleanupWorktrees" },
     { label: "$(refresh) Refrescar", command: "agentSessions.refresh" },
