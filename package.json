@@ -1,7 +1,7 @@
 {
   "name": "agent-sessions",
   "displayName": "Agent Sessions",
-  "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini) en el terminal integrado.",
+  "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini, Qwen Code) en el terminal integrado.",
   "version": "1.2.4",
   "publisher": "Zarritas",
   "author": "Jesús Lorenzo",
@@ -305,6 +305,11 @@
         {
           "id": "agentSessions.terminal.gemini",
           "title": "Gemini",
+          "icon": "comment-discussion"
+        },
+        {
+          "id": "agentSessions.terminal.qwen",
+          "title": "Qwen Code",
           "icon": "comment-discussion"
         }
       ]
