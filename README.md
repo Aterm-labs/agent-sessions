@@ -64,6 +64,8 @@ que usa la app nativa, así ambas UIs ven la misma metadata.
   (`.claude/commands/**`, versionados con el repo), los **globales del usuario**
   (`~/.claude/commands/**`), los **scripts del repo**
   (`package.json`/`Makefile`/`justfile`/`Cargo`) y las acciones de la extensión.
+  Al lanzar un script puedes **pasarle argumentos** o **ver su ayuda** (`--help`)
+  en vez de ejecutarlo a ciegas.
 - **Comandos globales de usuario**: acceso propio (menú «⋯» / comando) a los
   slash-commands de `~/.claude/commands`, independiente de un proyecto: eliges
   dónde lanzarlos.

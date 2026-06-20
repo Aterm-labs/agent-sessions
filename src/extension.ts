@@ -3430,6 +3430,17 @@ function npmRun(pm: string, script: string): string {
   return `npm run ${script}`;
 }
 
+/** Append CLI arguments to a script command. npm/yarn/pnpm/bun need `--` to
+ *  forward args/flags through the runner to the underlying script. */
+function withArgs(command: string, args: string): string {
+  const a = args.trim();
+  if (!a) return command;
+  if (/^(npm run |pnpm |yarn |bun run )/.test(command)) {
+    return `${command} -- ${a}`;
+  }
+  return `${command} ${a}`;
+}
+
 function discoverScripts(cwd: string): ScriptCommand[] {
   const out: ScriptCommand[] = [];
   // package.json scripts.
@@ -3503,6 +3514,45 @@ function runInTerminal(cwd: string, label: string, command: string): void {
   const terminal = vscode.window.createTerminal({ name: `▶ ${label}`, cwd });
   terminal.show();
   terminal.sendText(command, true);
+}
+
+/** Launch a project script, but first let the user pass arguments or see the
+ *  script's `--help` — many scripts need flags/args and running them blind is
+ *  useless. Plain "Ejecutar" keeps the old one-click behaviour. */
+async function runProjectScript(cwd: string, sc: ScriptCommand): Promise<void> {
+  const choice = await vscode.window.showQuickPick(
+    [
+      { label: "$(play) Ejecutar", detail: sc.command, action: "run" },
+      {
+        label: "$(edit) Ejecutar con argumentos…",
+        detail: `${sc.command} <args>`,
+        action: "args",
+      },
+      {
+        label: "$(question) Ver ayuda (--help)",
+        detail: withArgs(sc.command, "--help"),
+        action: "help",
+      },
+    ],
+    { placeHolder: `${sc.label} — ¿cómo lanzarlo?` }
+  );
+  if (!choice) return;
+  if (choice.action === "run") {
+    runInTerminal(cwd, sc.label, sc.command);
+    return;
+  }
+  if (choice.action === "help") {
+    runInTerminal(cwd, `${sc.label} --help`, withArgs(sc.command, "--help"));
+    return;
+  }
+  const args = await vscode.window.showInputBox({
+    title: sc.label,
+    prompt: "Argumentos para el script",
+    placeHolder: "p. ej. --port 3000 --watch",
+    ignoreFocusOut: true,
+  });
+  if (args === undefined) return; // cancelled
+  runInTerminal(cwd, sc.label, withArgs(sc.command, args));
 }
 
 /** Launch a Claude session in `cwd` and send a custom slash-command. */
@@ -3604,7 +3654,7 @@ async function showProjectCommands(view: SessionsView, cwd?: string): Promise<vo
       items.push({
         label: `$(play) ${sc.label}`,
         description: sc.description,
-        run: () => runInTerminal(c, sc.label, sc.command),
+        run: () => runProjectScript(c, sc),
       });
     }
   }
