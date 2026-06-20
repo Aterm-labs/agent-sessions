@@ -3322,7 +3322,7 @@ async function showActionsMenu(): Promise<void> {
     { label: `$(diff) Comparar resultados de worktrees…${pro}`, command: "agentSessions.compareWorktrees" },
     { label: `$(trash) Limpiar worktrees de comparativa…${pro}`, command: "agentSessions.cleanupWorktrees" },
     { label: `$(arrow-swap) Portar sesión a otro proveedor…${pro}`, command: "agentSessions.portSession" },
-    { label: `$(folder-active) Portar proyecto a otro proveedor…${pro}`, command: "agentSessions.portProject" },
+    { label: `$(folder-active) Duplicar proyecto para otro proveedor…${pro}`, command: "agentSessions.portProject" },
     { label: "$(refresh) Refrescar", command: "agentSessions.refresh" },
     sep("Pro"),
     {
@@ -3853,7 +3853,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand(
       "agentSessions.portProject",
-      runPro("portProject", "Portar proyecto entre proveedores")
+      runPro("portProject", "Duplicar proyecto para otro proveedor")
     ),
     vscode.commands.registerCommand("agentSessions.manageTagCatalog", () =>
       manageTagCatalog(view)

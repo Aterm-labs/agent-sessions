@@ -144,10 +144,16 @@ son **Pro**:
 - **Configurar servidor MCP con un clic**: registra el servidor MCP en
   `.vscode/mcp.json` (o copia el snippet) desde la extensión. El servidor en sí
   (`agent-sessions-cli serve`) es OSS y puedes configurarlo a mano gratis.
-- **Portabilidad entre proveedores**: porta una **sesión** o un **proyecto
-  entero** (todas sus sesiones) de un agente a otro. Genera un hand-off con la
-  transcripción completa y lanza el proveedor destino sembrado con ese contexto.
-  OpenCode puede ser destino, no origen (su contenido no es legible desde disco).
+- **Portar sesión entre proveedores**: lleva una **conversación** de un agente a
+  otro. Genera un hand-off con la transcripción completa y lanza el proveedor
+  destino sembrado con ese contexto. OpenCode vale como destino, no como origen
+  (su contenido no es legible desde disco).
+- **Duplicar proyecto para otro proveedor**: clona la carpeta del proyecto y
+  **convierte su configuración de agente** a las convenciones del destino —
+  fichero de instrucciones (`CLAUDE.md` ↔ `AGENTS.md` ↔ `GEMINI.md`) y comandos
+  personalizados (`.claude/commands/*.md` ↔ `.gemini/commands/*.toml` ↔
+  `.opencode/command/*.md`, incluidos los placeholders de argumentos). Excluye
+  `node_modules`/build, conserva `.git` y deja un `PORT-NOTES.md`.
 
 Hay una **prueba de 14 días**; un indicador en la barra de estado muestra
 «Pro / Prueba Nd / Activar Pro». Después de la prueba, esas acciones piden
