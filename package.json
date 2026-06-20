@@ -1,8 +1,8 @@
 {
   "name": "agent-sessions",
   "displayName": "Agent Sessions",
-  "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini, Qwen Code) en el terminal integrado.",
-  "version": "1.2.4",
+  "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini, Qwen Code, Goose, Factory Droid) en el terminal integrado.",
+  "version": "1.2.5",
   "publisher": "Zarritas",
   "author": "Jesús Lorenzo",
   "license": "MIT",
@@ -310,6 +310,16 @@
         {
           "id": "agentSessions.terminal.qwen",
           "title": "Qwen Code",
+          "icon": "comment-discussion"
+        },
+        {
+          "id": "agentSessions.terminal.goose",
+          "title": "Goose",
+          "icon": "comment-discussion"
+        },
+        {
+          "id": "agentSessions.terminal.factory",
+          "title": "Factory Droid",
           "icon": "comment-discussion"
         }
       ]

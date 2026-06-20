@@ -3142,7 +3142,7 @@ async function quickActions(view: SessionsView): Promise<void> {
 /** Register a VS Code terminal profile per provider so users can launch an
  *  agent straight from the terminal panel's `+` dropdown, without the panel. */
 function registerTerminalProfiles(context: vscode.ExtensionContext): void {
-  const providers = ["claude", "codex", "opencode", "gemini", "qwen"];
+  const providers = ["claude", "codex", "opencode", "gemini", "qwen", "goose", "factory"];
   for (const id of providers) {
     context.subscriptions.push(
       vscode.window.registerTerminalProfileProvider(`agentSessions.terminal.${id}`, {
