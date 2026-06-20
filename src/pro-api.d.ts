@@ -81,6 +81,8 @@ export interface ProModule {
   proReport(api: ProApi): Promise<void>;
   exportConversationHtml(api: ProApi): Promise<void>;
   dailySummary(api: ProApi): Promise<void>;
+  /** Port a session's conversation to another provider (cross-provider hand-off). */
+  portSession(api: ProApi): Promise<void>;
   /** Optional background setup (timers/watchers). Called once when the module
    *  loads, if the gate allows Pro. */
   activate?(api: ProApi): void;

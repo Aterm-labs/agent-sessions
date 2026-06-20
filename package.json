@@ -219,6 +219,12 @@
         "category": "Agent Sessions"
       },
       {
+        "command": "agentSessions.portSession",
+        "title": "Portar sesión a otro proveedor… (Pro)",
+        "category": "Agent Sessions",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "command": "agentSessions.projectCommands",
         "title": "Comandos del proyecto…",
         "category": "Agent Sessions",

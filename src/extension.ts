@@ -3321,6 +3321,7 @@ async function showActionsMenu(): Promise<void> {
     { label: `$(server-process) Configurar servidor MCP…${pro}`, command: "agentSessions.configureMcp" },
     { label: `$(diff) Comparar resultados de worktrees…${pro}`, command: "agentSessions.compareWorktrees" },
     { label: `$(trash) Limpiar worktrees de comparativa…${pro}`, command: "agentSessions.cleanupWorktrees" },
+    { label: `$(arrow-swap) Portar sesión a otro proveedor…${pro}`, command: "agentSessions.portSession" },
     { label: "$(refresh) Refrescar", command: "agentSessions.refresh" },
     sep("Pro"),
     {
@@ -3844,6 +3845,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       "agentSessions.dailySummary",
       runPro("dailySummary", "Resumen diario")
+    ),
+    vscode.commands.registerCommand(
+      "agentSessions.portSession",
+      runPro("portSession", "Portar sesión entre proveedores")
     ),
     vscode.commands.registerCommand("agentSessions.manageTagCatalog", () =>
       manageTagCatalog(view)
