@@ -2,7 +2,7 @@
   "name": "agent-sessions",
   "displayName": "Agent Sessions",
   "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini) en el terminal integrado.",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "publisher": "Zarritas",
   "author": "Jesús Lorenzo",
   "license": "MIT",
@@ -223,6 +223,12 @@
         "title": "Portar sesión a otro proveedor… (Pro)",
         "category": "Agent Sessions",
         "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "agentSessions.portProject",
+        "title": "Portar proyecto a otro proveedor… (Pro)",
+        "category": "Agent Sessions",
+        "icon": "$(folder-active)"
       },
       {
         "command": "agentSessions.projectCommands",
