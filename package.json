@@ -2,7 +2,7 @@
   "name": "agent-sessions",
   "displayName": "Agent Sessions",
   "description": "Lista, previsualiza y reanuda tus sesiones de agentes de código (Claude Code, Codex, OpenCode, Gemini, Qwen Code, Goose, Factory Droid) en el terminal integrado.",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "publisher": "Zarritas",
   "author": "Jesús Lorenzo",
   "license": "MIT",
@@ -229,6 +229,12 @@
         "title": "Duplicar proyecto para otro proveedor… (Pro)",
         "category": "Agent Sessions",
         "icon": "$(folder-active)"
+      },
+      {
+        "command": "agentSessions.memoryGraph",
+        "title": "Gráfico de memoria… (Pro)",
+        "category": "Agent Sessions",
+        "icon": "$(type-hierarchy)"
       },
       {
         "command": "agentSessions.projectCommands",

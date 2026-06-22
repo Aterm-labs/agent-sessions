@@ -103,11 +103,14 @@ que usa la app nativa, así ambas UIs ven la misma metadata.
 - **Copiar/guardar** la conversación como Markdown.
 
 ### Costes y monitorización
-- **Quota** del proveedor: pill de % con cuenta atrás hasta el reset.
+- **Quota** del proveedor: pill de % con cuenta atrás hasta el reset. El uso 5h/7d
+  se obtiene de la fuente **nativa de Claude** o, si falta, del **endpoint oficial
+  de uso de Anthropic** con cache propio — **sin depender de plugins de terceros**.
 - **Dashboard** con KPIs (sesiones, coste $, tokens), barras por proveedor/proyecto
   y sparkline de 30 días.
 - **Alerta de coste diario** + indicador en la barra de estado.
-- Estado de servicio (statuspage) por proveedor; **notificaciones** idle/finish
+- **Estado del servicio** como badge junto al nombre del proveedor; al pulsarlo abre
+  su **página de estado** (Claude, Codex, Gemini, OpenCode). **Notificaciones** idle/finish
   con **nivel configurable** (`notificationLevel`: todas / importantes / errores /
   ninguna; los diálogos de confirmación nunca se silencian).
 - **% de contexto** por sesión; en Claude la ventana es **fijable**
@@ -128,6 +131,13 @@ que usa la app nativa, así ambas UIs ven la misma metadata.
 La extensión es **open-core**: casi todo es gratis. Unas pocas funciones avanzadas
 son **Pro**:
 
+- **Gráfico de memoria**: mapea la jerarquía de memoria del proveedor (global /
+  proyecto / local + directorio de memoria) como árbol o vista de secciones, con
+  preview estructurada de cada `.md`. Crear/añadir/borrar/notas: el **agente
+  redacta** y la extensión **guarda** (con tu confirmación). Botón por proyecto.
+- **Ejecutar scripts del proyecto** (npm / Make / justfile / Cargo), agrupados por
+  intérprete, con inferencia de argumentos y **parseo de `--help`** para CLIs
+  seguros (cargo, python, uv, pytest…). _(Los slash-commands del agente son gratis.)_
 - **Comparativa paralela** (un agente por git worktree) + comparar/limpiar worktrees.
 - **Plantillas de lanzamiento** (guardar / lanzar / gestionar).
 - **Perfiles de espacio de trabajo**: guarda un conjunto de sesiones y reábrelas

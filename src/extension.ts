@@ -926,6 +926,24 @@ class SessionsView implements vscode.WebviewViewProvider {
         return addProjectToWorkspace(String(msg.cwd || ""));
       case "projectCommands":
         return showProjectCommands(this, msg.cwd ? String(msg.cwd) : undefined);
+      case "openStatusPage": {
+        const pages: Record<string, string> = {
+          claude: "https://status.claude.com",
+          codex: "https://status.openai.com",
+          gemini: "https://aistudio.google.com/status",
+          opencode: "https://status.opencode.de/",
+        };
+        const url = pages[String(msg.provider || "")];
+        if (url) void vscode.env.openExternal(vscode.Uri.parse(url));
+        return;
+      }
+      case "memoryGraph":
+        // Gated (Pro): genera el gráfico de memoria del proyecto por su cwd.
+        await vscode.commands.executeCommand(
+          "agentSessions.memoryGraph",
+          msg.cwd ? String(msg.cwd) : undefined
+        );
+        return;
       case "actionsMenu":
         return showActionsMenu();
       case "proReport":
@@ -2760,17 +2778,35 @@ async function pickProjectCwd(view: SessionsView, cwd?: string): Promise<string 
   for (const s of view.sessionsSnapshot()) {
     if (s.cwd) seen.add(s.cwd);
   }
-  const items = Array.from(seen)
+  // También las carpetas abiertas del workspace, aunque no tengan sesiones aún.
+  for (const f of vscode.workspace.workspaceFolders || []) seen.add(f.uri.fsPath);
+  type CwdItem = vscode.QuickPickItem & { cwd?: string; browse?: boolean };
+  const items: CwdItem[] = Array.from(seen)
     .sort()
     .map((c) => ({
       label: path.basename(c) || c,
       description: displayPath(c),
       cwd: c,
     }));
-  const pick = await vscode.window.showQuickPick(items, {
-    placeHolder: "Proyecto a editar",
+  // Permite elegir cualquier carpeta (no solo las que ya tienen sesiones).
+  items.push({
+    label: "$(folder-opened) Examinar otra carpeta…",
+    browse: true,
   });
-  return pick?.cwd;
+  const pick = await vscode.window.showQuickPick(items, {
+    placeHolder: "Proyecto (carpeta)",
+  });
+  if (!pick) return undefined;
+  if (pick.browse) {
+    const sel = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: "Usar esta carpeta",
+    });
+    return sel && sel[0] ? sel[0].fsPath : undefined;
+  }
+  return pick.cwd;
 }
 
 async function renameProject(
@@ -3292,6 +3328,9 @@ async function showActionsMenu(): Promise<void> {
     { label: "$(clear-all) Limpiar filtro", command: "agentSessions.clearFilter" },
     { label: "$(list-tree) Agrupar por…", command: "agentSessions.setGroupBy" },
     { label: "$(list-selection) Acciones rápidas de sesión…", command: "agentSessions.quickActions" },
+    sep("Visualizar (Pro)"),
+    { label: `$(type-hierarchy) Gráfico de memoria…${pro}`, command: "agentSessions.memoryGraph" },
+    { label: `$(graph) Informe de actividad y costes…${pro}`, command: "agentSessions.proReport" },
     sep("Comandos"),
     { label: "$(list-unordered) Comandos del proyecto…", command: "agentSessions.projectCommands" },
     { label: "$(globe) Comandos globales de usuario…", command: "agentSessions.userCommands" },
@@ -3415,6 +3454,29 @@ interface ScriptCommand {
   label: string;
   description: string;
   command: string; // shell line to run
+  acceptsArgs: boolean; // inferido: ¿tiene sentido pasarle argumentos?
+  argsHelp?: string; // pista en línea de los args aceptados (p. ej. params de just)
+  helpBin?: string; // binario líder con `--help` seguro+parseable (cargo, python…)
+  dir?: string; // carpeta donde ejecutar (subproyecto); por defecto el cwd elegido
+  rel?: string; // ruta relativa de la subcarpeta, para mostrar de dónde viene
+}
+
+// CLIs cuyo `--help` es convencionalmente inofensivo (sale y no ejecuta) y de
+// formato regular (clap/argparse/click) → seguro capturarlo y parsear sus flags.
+const SAFE_HELP_CMDS = new Set([
+  "cargo", "rustc", "python", "python3", "py", "pip", "pip3", "poetry", "uv",
+  "pytest", "ruff", "mypy", "black", "go", "deno", "dotnet",
+]);
+
+/** Binario líder de una línea de shell si está en la lista blanca segura; quita
+ *  asignaciones de entorno previas (`FOO=bar cmd`) y la ruta. */
+function leadingHelpBin(rawCmd: string): string | undefined {
+  let s = (rawCmd || "").trim();
+  while (/^[A-Za-z_][A-Za-z0-9_]*=\S+\s+/.test(s)) {
+    s = s.replace(/^[A-Za-z_][A-Za-z0-9_]*=\S+\s+/, "");
+  }
+  const first = (s.split(/\s+/)[0] || "").split("/").pop() || "";
+  return SAFE_HELP_CMDS.has(first) ? first : undefined;
 }
 
 function detectPackageManager(cwd: string): string {
@@ -3443,7 +3505,8 @@ function withArgs(command: string, args: string): string {
   return `${command} ${a}`;
 }
 
-function discoverScripts(cwd: string): ScriptCommand[] {
+/** Scripts declarados directamente EN `cwd` (sin recorrer subcarpetas). */
+function collectScriptsAt(cwd: string): ScriptCommand[] {
   const out: ScriptCommand[] = [];
   // package.json scripts.
   const pkgPath = path.join(cwd, "package.json");
@@ -3456,6 +3519,10 @@ function discoverScripts(cwd: string): ScriptCommand[] {
           label: name,
           description: `npm · ${String(body).slice(0, 80)}`,
           command: npmRun(pm, name),
+          // npm reenvía flags con `-- …`; casi cualquier script admite argumentos.
+          acceptsArgs: true,
+          // Si el body lanza un CLI seguro (python/uv/pytest…), podremos parsear su --help.
+          helpBin: leadingHelpBin(String(body)),
         });
       }
     } catch {
@@ -3475,7 +3542,8 @@ function discoverScripts(cwd: string): ScriptCommand[] {
         const t = m[1];
         if (t.startsWith(".") || seen.has(t)) continue;
         seen.add(t);
-        out.push({ label: t, description: "make", command: `make ${t}` });
+        // Los targets de make no toman argumentos posicionales → ejecución directa.
+        out.push({ label: t, description: "make", command: `make ${t}`, acceptsArgs: false });
       }
     } catch {
       /* skip */
@@ -3495,7 +3563,16 @@ function discoverScripts(cwd: string): ScriptCommand[] {
         const t = m[1];
         if (seen.has(t)) continue;
         seen.add(t);
-        out.push({ label: t, description: "just", command: `just ${t}` });
+        // La firma de la receta declara sus parámetros: si los tiene, acepta args
+        // y los mostramos como ayuda; si no, ejecución directa.
+        const params = (m[2] || "").trim();
+        out.push({
+          label: t,
+          description: params ? `just · ${params}` : "just",
+          command: `just ${t}`,
+          acceptsArgs: params.length > 0,
+          argsHelp: params || undefined,
+        });
       }
     } catch {
       /* skip */
@@ -3505,10 +3582,125 @@ function discoverScripts(cwd: string): ScriptCommand[] {
   // Cargo: standard subcommands when a manifest is present.
   if (fs.existsSync(path.join(cwd, "Cargo.toml"))) {
     for (const sub of ["build", "test", "run", "check", "clippy"]) {
-      out.push({ label: `cargo ${sub}`, description: "cargo", command: `cargo ${sub}` });
+      // Los subcomandos de cargo aceptan flags/args (p. ej. `cargo test <name>`).
+      out.push({ label: `cargo ${sub}`, description: "cargo", command: `cargo ${sub}`, acceptsArgs: true, helpBin: "cargo" });
     }
   }
   return out;
+}
+
+/** Descubre scripts en el proyecto Y sus subcarpetas (útil en meta-repos /
+ *  monorepos con submódulos). Acotado en profundidad, saltando dirs pesados;
+ *  cada script recuerda su carpeta (`dir`) para ejecutarse en el sitio correcto. */
+function discoverScripts(rootCwd: string): ScriptCommand[] {
+  const skip = new Set([
+    "node_modules", ".git", "target", "dist", "out", ".next", "build",
+    "vendor", ".venv", "venv", "__pycache__", ".cache",
+  ]);
+  const out: ScriptCommand[] = [];
+  let visited = 0;
+  const walk = (dir: string, depth: number) => {
+    if (out.length > 200 || visited > 600) return;
+    visited++;
+    const rel = path.relative(rootCwd, dir);
+    for (const sc of collectScriptsAt(dir)) {
+      sc.dir = dir;
+      sc.rel = rel || undefined;
+      out.push(sc);
+    }
+    if (depth >= 4) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (!e.isDirectory() || skip.has(e.name) || e.name.startsWith(".")) continue;
+      walk(path.join(dir, e.name), depth + 1);
+    }
+  };
+  walk(rootCwd, 0);
+  return out;
+}
+
+/** Grupo por lenguaje/intérprete de ejecución, para organizar la lista. */
+function scriptGroup(sc: ScriptCommand): string {
+  const bin = sc.helpBin;
+  if (bin === "cargo" || bin === "rustc") return "Rust · cargo";
+  if (
+    ["python", "python3", "py", "pip", "pip3", "poetry", "uv", "pytest", "ruff", "mypy", "black"].includes(bin || "")
+  )
+    return "Python";
+  if (bin === "go") return "Go";
+  if (bin === "deno") return "Deno";
+  if (bin === "dotnet") return ".NET";
+  if (sc.description.startsWith("make")) return "Make";
+  if (sc.description.startsWith("just")) return "just";
+  if (sc.description.startsWith("npm")) return "Node · npm";
+  return "Otros";
+}
+
+// ── Ayuda real de scripts (parseo de `--help` para CLIs seguros) ────────────
+
+interface FlagItem {
+  flag: string; // p. ej. "--port"
+  insert: string; // lo que se inserta: "--port <PORT>"
+  desc: string;
+}
+
+const helpFlagsCache = new Map<string, FlagItem[]>();
+
+/** Ejecuta `<command> --help` capturando salida (stdout+stderr), con timeout y
+ *  kill. Resuelve siempre (el help puede salir con código ≠ 0). */
+function captureHelp(cwd: string, command: string): Promise<string> {
+  return new Promise((resolve) => {
+    cp.exec(
+      withArgs(command, "--help"),
+      { cwd, timeout: 4000, windowsHide: true, maxBuffer: 1024 * 1024 },
+      (_err, stdout, stderr) => {
+        resolve(`${stdout || ""}\n${stderr || ""}`.trim());
+      }
+    );
+  });
+}
+
+/** Extrae flags `--xxx [<val>]` + descripción de una salida de `--help`
+ *  (heurística que cubre clap/argparse/click). */
+function parseHelpFlags(out: string): FlagItem[] {
+  const seen = new Set<string>();
+  const items: FlagItem[] = [];
+  for (const line of out.split(/\r?\n/)) {
+    const m = line.match(
+      /(--[a-zA-Z][\w-]+)(?:[ =](<[^>]+>|\[[^\]]+\]|[A-Z][A-Z0-9_]{1,}))?(?:\s{2,}(.*))?/
+    );
+    if (!m) continue;
+    const flag = m[1];
+    if (seen.has(flag)) continue;
+    seen.add(flag);
+    const val = m[2] ? ` ${m[2]}` : "";
+    items.push({ flag, insert: flag + val, desc: (m[3] || "").trim() });
+    if (items.length >= 80) break;
+  }
+  return items;
+}
+
+/** Captura+parsea (cacheado por sesión) los flags reales de un script seguro. */
+async function getHelpFlags(cwd: string, sc: ScriptCommand): Promise<FlagItem[]> {
+  const key = `${cwd}::${sc.command}`;
+  const cached = helpFlagsCache.get(key);
+  if (cached) return cached;
+  const out = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Agent Sessions: leyendo la ayuda de ${sc.label}…`,
+      cancellable: false,
+    },
+    () => captureHelp(cwd, sc.command)
+  );
+  const flags = parseHelpFlags(out);
+  helpFlagsCache.set(key, flags);
+  return flags;
 }
 
 /** Run a shell command in a fresh integrated terminal rooted at `cwd`. */
@@ -3522,22 +3714,32 @@ function runInTerminal(cwd: string, label: string, command: string): void {
  *  script's `--help` — many scripts need flags/args and running them blind is
  *  useless. Plain "Ejecutar" keeps the old one-click behaviour. */
 async function runProjectScript(cwd: string, sc: ScriptCommand): Promise<void> {
-  const choice = await vscode.window.showQuickPick(
-    [
-      { label: "$(play) Ejecutar", detail: sc.command, action: "run" },
-      {
-        label: "$(edit) Ejecutar con argumentos…",
-        detail: `${sc.command} <args>`,
-        action: "args",
-      },
-      {
-        label: "$(question) Ver ayuda (--help)",
-        detail: withArgs(sc.command, "--help"),
-        action: "help",
-      },
-    ],
-    { placeHolder: `${sc.label} — ¿cómo lanzarlo?` }
-  );
+  // Siempre ofrecemos pasar argumentos; la inferencia (sc.acceptsArgs/argsHelp)
+  // solo decide si además mostramos AYUDA de los args: en línea para los params
+  // de `just`, o vía `--help` para los scripts que sabemos que la aceptan.
+  type Opt = vscode.QuickPickItem & { action: "run" | "args" | "help" };
+  const opts: Opt[] = [
+    { label: "$(play) Ejecutar", detail: sc.command, action: "run" },
+    {
+      label: "$(edit) Ejecutar con argumentos…",
+      detail: sc.argsHelp ? `args: ${sc.argsHelp}` : `${sc.command} <args>`,
+      action: "args",
+    },
+  ];
+  // Ayuda de argumentos: la del propio script (`--help`) cuando sabemos que los
+  // acepta y no tenemos ya una pista en línea (los params de just).
+  if (sc.acceptsArgs && !sc.argsHelp) {
+    opts.push({
+      label: "$(question) Ver ayuda (--help)",
+      detail: withArgs(sc.command, "--help"),
+      action: "help",
+    });
+  }
+  const choice = await vscode.window.showQuickPick(opts, {
+    placeHolder: sc.argsHelp
+      ? `${sc.label} — argumentos: ${sc.argsHelp}`
+      : `${sc.label} — ¿cómo lanzarlo?`,
+  });
   if (!choice) return;
   if (choice.action === "run") {
     runInTerminal(cwd, sc.label, sc.command);
@@ -3547,10 +3749,44 @@ async function runProjectScript(cwd: string, sc: ScriptCommand): Promise<void> {
     runInTerminal(cwd, `${sc.label} --help`, withArgs(sc.command, "--help"));
     return;
   }
+  // "Ejecutar con argumentos…": ofrecemos los argumentos REALES del script.
+  //  • CLI seguro (cargo/python/…): parseamos su `--help` y mostramos sus flags
+  //    de verdad en un selector (elegir → editar valores), sin inventar nada.
+  //  • just: sus parámetros van en el `prompt` (persiste bajo el campo).
+  //  • resto que acepta args: dejamos su `--help` a la vista en el terminal.
+  let draft = "";
+  if (sc.helpBin) {
+    const flags = await getHelpFlags(cwd, sc);
+    if (flags.length) {
+      const picked = await vscode.window.showQuickPick(
+        flags.map((f) => ({ label: f.insert, description: f.desc || undefined, ins: f.insert })),
+        {
+          canPickMany: true,
+          matchOnDescription: true,
+          placeHolder: `${sc.label} — flags reales de ${sc.helpBin} (elige y luego edita los valores)`,
+        }
+      );
+      if (picked === undefined) return; // cancelled
+      draft = picked.map((p) => p.ins).join(" ");
+    } else {
+      // Parser sin resultados: deja el --help crudo a la vista.
+      runInTerminal(cwd, `${sc.label} --help`, withArgs(sc.command, "--help"));
+    }
+  } else if (sc.acceptsArgs && !sc.argsHelp) {
+    runInTerminal(cwd, `${sc.label} --help`, withArgs(sc.command, "--help"));
+  }
   const args = await vscode.window.showInputBox({
-    title: sc.label,
-    prompt: "Argumentos para el script",
-    placeHolder: "p. ej. --port 3000 --watch",
+    title: `${sc.label} — argumentos`,
+    value: draft || undefined,
+    prompt: sc.argsHelp
+      ? `Parámetros: ${sc.argsHelp}`
+      : sc.helpBin
+        ? "Rellena los valores (<…>) y añade lo que falte"
+        : sc.acceptsArgs
+          ? "Escribe los argumentos (su ayuda --help está en el terminal)"
+          : "Argumentos para el script",
+    // Ejemplo ESTRICTO: params de just; para el resto no inventamos flags.
+    placeHolder: sc.argsHelp || (sc.acceptsArgs ? "argumentos (ver --help)" : "argumentos…"),
     ignoreFocusOut: true,
   });
   if (args === undefined) return; // cancelled
@@ -3646,18 +3882,38 @@ async function showProjectCommands(view: SessionsView, cwd?: string): Promise<vo
   pushSlash(projectCmds, "Comandos del proyecto (.claude/commands)");
   pushSlash(globalCmds, "Comandos globales (~/.claude/commands)");
 
+  // Scripts del repo (package.json / Makefile / justfile / Cargo): función Pro.
+  // Agrupados por lenguaje/intérprete. Los slash-commands del agente (arriba)
+  // siguen siendo gratis.
   const scripts = discoverScripts(c);
   if (scripts.length) {
-    items.push({
-      label: "Scripts del proyecto",
-      kind: vscode.QuickPickItemKind.Separator,
-    });
+    const byGroup = new Map<string, ScriptCommand[]>();
     for (const sc of scripts) {
+      const g = scriptGroup(sc);
+      const list = byGroup.get(g) || [];
+      list.push(sc);
+      byGroup.set(g, list);
+    }
+    // Orden de grupos: alfabético, con "Otros" al final.
+    const groups = [...byGroup.keys()].sort((a, b) =>
+      a === "Otros" ? 1 : b === "Otros" ? -1 : a.localeCompare(b)
+    );
+    for (const g of groups) {
       items.push({
-        label: `$(play) ${sc.label}`,
-        description: sc.description,
-        run: () => runProjectScript(c, sc),
+        label: `Scripts · ${g} (Pro)`,
+        kind: vscode.QuickPickItemKind.Separator,
       });
+      for (const sc of byGroup.get(g)!) {
+        items.push({
+          label: `$(play) ${sc.label}`,
+          // Incluye la subcarpeta de origen (en meta-repos/monorepos).
+          description: `${sc.rel ? sc.rel + " · " : ""}${sc.description} · Pro`,
+          run: () => {
+            if (!requirePro("Ejecutar scripts del proyecto")) return;
+            return runProjectScript(sc.dir || c, sc);
+          },
+        });
+      }
     }
   }
 
@@ -3854,6 +4110,20 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       "agentSessions.portProject",
       runPro("portProject", "Duplicar proyecto para otro proveedor")
+    ),
+    vscode.commands.registerCommand(
+      "agentSessions.memoryGraph",
+      async (cwd?: string) => {
+        if (!requirePro("Gráfico de memoria")) return;
+        if (!proModule) {
+          notifyInfo(
+            "Agent Sessions: «Gráfico de memoria» requiere la edición Pro (no incluida en esta build Community)."
+          );
+          return;
+        }
+        // Con cwd → directo al proyecto (su proveedor se infiere); sin él, interactivo.
+        await proModule.memoryGraph(proApi, cwd ? { cwd } : undefined);
+      }
     ),
     vscode.commands.registerCommand("agentSessions.manageTagCatalog", () =>
       manageTagCatalog(view)

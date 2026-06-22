@@ -57,6 +57,20 @@ try {
   // Older persisted state may predate `collapsed`; every consumer indexes it.
   if (ui.collapsed == null || typeof ui.collapsed !== "object") ui.collapsed = {};
   if (ui.density !== "compact") ui.density = "comfortable";
+  if (ui.genOnly == null) ui.genOnly = false;
+
+  // Etiqueta reservada de las sesiones de generación de memoria (la pone el módulo
+  // Pro: agent-sessions-pro → MEMGEN_TAG). Ocultas por defecto; el botón «memoria»
+  // las muestra en exclusiva.
+  const MEMGEN_TAG = "auto-memoria";
+  // Firma de los prompts de generación (para ocultar también las sesiones de
+  // generación previas, anteriores al etiquetado).
+  const GEN_TITLE_RE = /^genera (el contenido|s[oó]lo la entrada)/i;
+  const isMemGen = (s) => {
+    const m = metaFor(s);
+    if (m && m.tags && m.tags.indexOf(MEMGEN_TAG) >= 0) return true;
+    return GEN_TITLE_RE.test(((s && s.title) || "").trim());
+  };
 
   const NO_PROJECT = "(sin proyecto)";
 
@@ -83,6 +97,7 @@ try {
     archive: `<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.5 2h13v3h-13V2Zm1 4h11v8h-11V6Zm3.5 2v1.5h4V8H6Z"/></svg>`,
     folderAdd: `<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.5 3a.5.5 0 0 1 .5-.5h4.41l1 1H14a.5.5 0 0 1 .5.5v3.1A4.5 4.5 0 0 0 8.26 13.5H3a1.5 1.5 0 0 1-1.5-1.5V3Z"/><path fill="currentColor" d="M12 8.5h1.2v1.8H15v1.2h-1.8V13H12v-1.5h-1.8v-1.2H12V8.5Z"/></svg>`,
     command: `<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1.8 3.2h2v2h-2v-2Zm4 .3h8.4v1.4H5.8V3.5ZM1.8 7h2v2h-2V7Zm4 .3h8.4v1.4H5.8V7.3ZM1.8 10.8h2v2h-2v-2Zm4 .3h8.4v1.4H5.8v-1.4Z"/></svg>`,
+    graph: `<svg viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.2" d="M8 4.5v3M8 7.5 4.5 11M8 7.5 11.5 11"/><circle cx="8" cy="3" r="2" fill="currentColor"/><circle cx="4" cy="12.5" r="2" fill="currentColor"/><circle cx="12" cy="12.5" r="2" fill="currentColor"/></svg>`,
   };
 
   // ── Provider colours (theme-aware via CSS vars) ──────────────────────────
@@ -172,6 +187,8 @@ try {
    *   - everything else  — substring against title/name/cwd/branch/tags.
    *  Empty query matches everything. */
   const matchesFilter = (s, q) => {
+    // Oculta las sesiones de generación de memoria salvo en modo «solo memoria».
+    if (ui.genOnly ? !isMemGen(s) : isMemGen(s)) return false;
     if (!q) return true;
     const m = metaFor(s);
     const tags = ((m && m.tags) || []).map((t) => t.toLowerCase());
@@ -528,7 +545,7 @@ try {
         count: ps.length,
         accentVar: PROVIDER_AVATAR[info.id] || "var(--vscode-charts-foreground)",
         quota: state.quotas[info.id],
-        serviceStatus: state.serviceStatus[info.id],
+        serviceStatus: state.serviceStatus[info.id] || statusLinkOnly(info.id),
         stateCounts: countStates(ps),
         collapsed,
       });
@@ -874,6 +891,9 @@ try {
       );
     }
     node.appendChild(el("span", { class: "name", text: label }));
+    // El estado del servicio va pegado al nombre del proveedor y abre su página
+    // de estado al pulsarlo.
+    if (serviceStatus) node.appendChild(statusDot(serviceStatus));
     node.appendChild(
       el("span", {
         class: "meta",
@@ -889,7 +909,6 @@ try {
       const pills = stateCountPills(stateCounts);
       pills.forEach((p) => node.appendChild(p));
     }
-    if (serviceStatus) node.appendChild(statusDot(serviceStatus));
     if (quota) {
       quotaPills(quota).forEach((p) => node.appendChild(p));
     }
@@ -912,6 +931,12 @@ try {
         actionBtn("Comandos del proyecto", ICONS.command, (e) => {
           e.stopPropagation();
           post("projectCommands", { cwd });
+        })
+      );
+      actions.appendChild(
+        actionBtn("Gráfico de memoria (Pro)", ICONS.graph, (e) => {
+          e.stopPropagation();
+          post("memoryGraph", { cwd });
         })
       );
       actions.appendChild(
@@ -1009,13 +1034,42 @@ try {
    *  when we have a status: green when operational, escalating to red for
    *  critical. The tooltip carries the description ("All Systems
    *  Operational", "Partial outage", …). */
+  // Proveedores con página de estado pública (deben coincidir con el mapa de
+  // URLs del lado extensión). Para los que no exponen indicador en vivo, igual
+  // mostramos un badge neutro que enlaza a su página.
+  const STATUS_PAGE_PROVIDERS = { claude: 1, codex: 1, gemini: 1, opencode: 1 };
+  const statusLinkOnly = (providerId) =>
+    STATUS_PAGE_PROVIDERS[providerId]
+      ? { provider: providerId, indicator: "unknown", description: "" }
+      : undefined;
+
   function statusDot(status) {
-    return el("span", {
-      class: "status-dot",
-      title: `${status.indicator}: ${status.description}`,
-      style: { color: statusColor(status.indicator) },
-      html: "●",
+    const live = status.indicator && status.indicator !== "unknown";
+    const pill = el("span", {
+      class: "status-pill",
+      title: live
+        ? `Estado de ${status.provider}: ${status.indicator} — ${status.description} · clic para ver la página de estado`
+        : `Estado de ${status.provider} · clic para ver la página de estado`,
+      style: {
+        background: statusColor(status.indicator),
+        color: "#fff",
+        cursor: "pointer",
+        padding: "1px 7px",
+        borderRadius: "10px",
+        fontSize: ".68em",
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: ".05em",
+        lineHeight: "1.5",
+      },
+      text: "status",
     });
+    pill.setAttribute("role", "button");
+    pill.addEventListener("click", (e) => {
+      e.stopPropagation();
+      post("openStatusPage", { provider: status.provider });
+    });
+    return pill;
   }
   function statusColor(ind) {
     switch (ind) {
@@ -1645,6 +1699,11 @@ try {
     activeBtn.setAttribute("aria-pressed", onlyActive ? "true" : "false");
     activeBtn.classList.toggle("active", onlyActive);
 
+    if (memgenBtn) {
+      memgenBtn.setAttribute("aria-pressed", ui.genOnly ? "true" : "false");
+      memgenBtn.classList.toggle("active", !!ui.genOnly);
+    }
+
     const tagToks = filterTokens(state.filter).filter((t) => t.startsWith("#"));
     tagsBtn.classList.toggle("active", tagToks.length > 0);
     tagsBtn.setAttribute(
@@ -1787,8 +1846,16 @@ try {
   const activeBtn = document.getElementById("qf-active");
   const tagsBtn = document.getElementById("qf-tags");
   const tagMenu = document.getElementById("tag-menu");
+  const memgenBtn = document.getElementById("qf-memgen");
 
   activeBtn.addEventListener("click", () => toggleToken("active:true"));
+  if (memgenBtn)
+    memgenBtn.addEventListener("click", () => {
+      ui.genOnly = !ui.genOnly;
+      vscode.setState(ui);
+      updateQuickFilters();
+      render();
+    });
   tagsBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (tagMenu.hidden) openTagMenu();

@@ -85,6 +85,14 @@ export interface ProModule {
   portSession(api: ProApi): Promise<void>;
   /** Port a whole project (all its sessions for a provider) to another provider. */
   portProject(api: ProApi): Promise<void>;
+  /** Render the provider's memory hierarchy (global / project / local) as an
+   *  interactive graph: CLAUDE.md & co, their @imports, and the per-project
+   *  memory dir with its [[links]]. With `opts.cwd` it targets that project
+   *  directly (provider inferred from its sessions); otherwise it's interactive. */
+  memoryGraph(
+    api: ProApi,
+    opts?: { cwd?: string | null; provider?: string }
+  ): Promise<void>;
   /** Optional background setup (timers/watchers). Called once when the module
    *  loads, if the gate allows Pro. */
   activate?(api: ProApi): void;
